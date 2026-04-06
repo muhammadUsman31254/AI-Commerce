@@ -1,0 +1,30 @@
+# Web framework
+fastapi[standard]
+uvicorn[standard]
+
+# Database
+motor
+pymongo
+
+# Auth
+python-jose[cryptography]
+bcrypt
+python-multipart
+
+# Settings
+pydantic-settings
+
+# LangChain / LangGraph / Groq
+langchain
+langchain-core
+langchain-groq
+langgraph
+
+# AI Services
+assemblyai
+google-genai
+elevenlabs
+cloudinary
+
+# HTTP client
+httpx
