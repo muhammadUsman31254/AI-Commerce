@@ -43,13 +43,22 @@ async def create_order(data: OrderCreate, seller_id: str = Depends(get_current_s
     db = get_db()
     total = sum(item.price * item.quantity for item in data.items)
     now = datetime.utcnow()
+
+    # Auto-generate order_no: max existing + 1
+    last = await db.orders.find_one(
+        {"seller_id": parse_object_id(seller_id), "order_no": {"$exists": True}},
+        sort=[("order_no", -1)],
+    )
+    order_no = (last["order_no"] + 1) if last else 1001
+
     doc = {
         "seller_id": parse_object_id(seller_id),
+        "order_no": order_no,
         "buyer_name": data.buyer_name,
         "buyer_phone": data.buyer_phone,
         "items": [
             {
-                "product_id": parse_object_id(item.product_id),
+                "product_id": item.product_id or "",
                 "product_name": item.product_name,
                 "quantity": item.quantity,
                 "price": item.price,
@@ -65,6 +74,16 @@ async def create_order(data: OrderCreate, seller_id: str = Depends(get_current_s
     result = await db.orders.insert_one(doc)
     doc["_id"] = result.inserted_id
     return serialize(doc)
+
+
+@router.delete("/{order_id}", status_code=204)
+async def delete_order(order_id: str, seller_id: str = Depends(get_current_seller)):
+    db = get_db()
+    result = await db.orders.delete_one(
+        {"_id": parse_object_id(order_id), "seller_id": parse_object_id(seller_id)}
+    )
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Order not found")
 
 
 @router.patch("/{order_id}/confirm")

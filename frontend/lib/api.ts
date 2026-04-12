@@ -37,6 +37,7 @@ export const authApi = {
     api.post("/auth/login", { email, password }),
   register: (data: { name: string; email: string; password: string; store_name: string; phone: string }) =>
     api.post("/auth/register", data),
+  me: () => api.get("/auth/me"),
 };
 
 // ── Products ──────────────────────────────────────────────────────────────────
@@ -47,14 +48,17 @@ export const productsApi = {
   update: (id: string, data: FormData) => api.put(`/products/${id}`, data),
   delete: (id: string) => api.delete(`/products/${id}`),
   analyzePhoto: (formData: FormData) => api.post("/products/analyze-photo", formData),
+  voiceAdd: (formData: FormData) => api.post("/products/voice-add", formData),
 };
 
 // ── Orders ────────────────────────────────────────────────────────────────────
 export const ordersApi = {
   list: (status?: string) => api.get("/orders", { params: status ? { status } : {} }),
   get: (id: string) => api.get(`/orders/${id}`),
+  create: (data: object) => api.post("/orders", data),
   confirm: (id: string) => api.patch(`/orders/${id}/confirm`),
   reject: (id: string, reason?: string) => api.patch(`/orders/${id}/reject`, { reason }),
+  delete: (id: string) => api.delete(`/orders/${id}`),
 };
 
 // ── Inventory ─────────────────────────────────────────────────────────────────

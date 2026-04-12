@@ -2,12 +2,13 @@
 
 import { useState, useRef, useCallback } from "react";
 import { useChatContext } from "@/context/ChatContext";
+import { PendingProduct } from "@/context/ChatContext";
 import { voiceApi } from "@/lib/api";
 
 type RecordState = "idle" | "recording" | "processing";
 
 export default function VoiceFAB() {
-  const { pushMessages, isOpen } = useChatContext();
+  const { pushMessages, isOpen, openImageUpload, triggerNavigation } = useChatContext();
   const [state, setState] = useState<RecordState>("idle");
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -40,17 +41,41 @@ export default function VoiceFAB() {
 
         try {
           const res = await voiceApi.sendCommand(blob);
-          const { transcript, reply } = res.data;
+          console.log("[Voice] response data:", res.data);
+          const { transcript, reply, action, pending, route, audio_base64 } = res.data;
+
           pushMessages([
             { id: `v-u-${Date.now()}`, role: "user", content: `🎤 ${transcript}` },
             { id: `v-a-${Date.now()}`, role: "assistant", content: reply },
           ]);
-        } catch {
+
+          // Play TTS audio — ElevenLabs if available, browser speech synthesis as fallback
+          if (audio_base64) {
+            const audio = new Audio(`data:audio/mp3;base64,${audio_base64}`);
+            audio.play().catch(() => {});
+          } else if (reply && typeof window !== "undefined" && "speechSynthesis" in window) {
+            const utt = new SpeechSynthesisUtterance(reply);
+            utt.lang = "ur-PK";
+            utt.rate = 0.9;
+            window.speechSynthesis.speak(utt);
+          }
+
+          if (action === "upload_image" && pending) {
+            openImageUpload(pending as PendingProduct);
+          } else if (action === "navigate" && route) {
+            triggerNavigation(route as string);
+          }
+        } catch (err: any) {
+          const detail =
+            err?.response?.data?.detail ||
+            err?.message ||
+            "Unknown error";
+          console.error("[Voice] error:", detail, err);
           pushMessages([
             {
               id: `v-err-${Date.now()}`,
               role: "assistant",
-              content: "Voice command failed. Please try again.",
+              content: `Voice command failed: ${detail}`,
             },
           ]);
         } finally {

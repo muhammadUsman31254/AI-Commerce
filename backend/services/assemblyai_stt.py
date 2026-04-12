@@ -25,11 +25,13 @@ def _transcribe_sync(audio_bytes: bytes, filename: str) -> str:
         headers=headers,
         json={
             "audio_url": audio_url,
-            "language_detection": True,
-            "speech_models": ["universal-3-pro", "universal-2"],
+            "language_code": "ur",
+            "speech_models": ["universal-2"],
         },
         timeout=30,
     )
+    if transcript_resp.status_code != 200:
+        raise RuntimeError(f"AssemblyAI transcript request failed {transcript_resp.status_code}: {transcript_resp.text}")
     transcript_resp.raise_for_status()
     transcript_id = transcript_resp.json()["id"]
     polling_url = f"{BASE_URL}/v2/transcript/{transcript_id}"

@@ -4,7 +4,7 @@ from datetime import datetime
 
 
 class OrderItem(BaseModel):
-    product_id: str
+    product_id: Optional[str] = ""
     product_name: str
     quantity: int
     price: float

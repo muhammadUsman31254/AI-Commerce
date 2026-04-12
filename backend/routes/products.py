@@ -107,6 +107,46 @@ async def delete_product(product_id: str, seller_id: str = Depends(get_current_s
         raise HTTPException(status_code=404, detail="Product not found")
 
 
+@router.post("/voice-add", status_code=201)
+async def voice_add_product(
+    name: str = Form(...),
+    price: float = Form(...),
+    quantity: int = Form(...),
+    category: str = Form(""),
+    image: UploadFile = File(...),
+    seller_id: str = Depends(get_current_seller),
+):
+    """Called by the voice image-upload modal. Uploads photo to Cloudinary,
+    generates description via Gemini, then saves the product to MongoDB."""
+    from services.gemini_vision import caption_image_from_url
+
+    db = get_db()
+
+    # 1. Upload image → get Cloudinary URL
+    image_url = await upload_image(image)
+
+    # 2. Auto-generate description from the photo
+    description = await caption_image_from_url(image_url)
+
+    # 3. Save product
+    now = datetime.utcnow()
+    doc = {
+        "seller_id": parse_object_id(seller_id),
+        "name": name,
+        "description": description,
+        "price": price,
+        "quantity": quantity,
+        "category": category,
+        "images": [image_url],
+        "status": "active",
+        "created_at": now,
+        "updated_at": now,
+    }
+    result = await db.products.insert_one(doc)
+    doc["_id"] = result.inserted_id
+    return serialize(doc)
+
+
 @router.post("/analyze-photo")
 async def analyze_photo(
     image: UploadFile = File(...),

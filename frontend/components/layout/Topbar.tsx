@@ -1,26 +1,22 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { removeToken } from "@/lib/auth";
 import LanguageToggle from "@/components/ui/LanguageToggle";
 import { useLanguage } from "@/context/LanguageContext";
 import { useChatContext } from "@/context/ChatContext";
 
 export default function Topbar() {
-  const router = useRouter();
   const { t } = useLanguage();
   const { isOpen, togglePanel } = useChatContext();
-
-  const handleLogout = () => {
-    removeToken();
-    router.push("/login");
-  };
 
   return (
     <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
       <div />
+
       <div className="flex items-center gap-3">
-        {/* Chat panel toggle */}
+        {/* Language toggle */}
+        <LanguageToggle />
+
+        {/* AI Assistant toggle */}
         <button
           onClick={togglePanel}
           title={isOpen ? "Close AI Assistant" : "Open AI Assistant"}
@@ -36,29 +32,6 @@ export default function Topbar() {
           <span className="hidden sm:inline">{t("chat_title")}</span>
         </button>
 
-        <LanguageToggle />
-
-        {/* Divider */}
-        <div className="h-5 w-px bg-gray-200" />
-
-        {/* Store badge */}
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 font-bold text-sm">
-            CC
-          </div>
-          <span className="text-sm font-medium text-gray-700">Clay &amp; Craft</span>
-        </div>
-
-        {/* Divider */}
-        <div className="h-5 w-px bg-gray-200" />
-
-        {/* Logout */}
-        <button
-          onClick={handleLogout}
-          className="text-sm text-gray-500 hover:text-red-500 transition-colors"
-        >
-          {t("sign_out")}
-        </button>
       </div>
     </header>
   );

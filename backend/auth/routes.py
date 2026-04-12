@@ -1,10 +1,10 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 import bcrypt
 from datetime import datetime
 from bson import ObjectId
 from database import get_db
 from models.seller import SellerRegister, SellerLogin
-from auth.jwt import create_access_token
+from auth.jwt import create_access_token, get_current_seller
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -46,3 +46,17 @@ async def login(data: SellerLogin):
 
     token = create_access_token(str(seller["_id"]))
     return {"access_token": token, "token_type": "bearer"}
+
+
+@router.get("/me")
+async def me(seller_id: str = Depends(get_current_seller)):
+    db = get_db()
+    seller = await db.sellers.find_one({"_id": ObjectId(seller_id)})
+    if not seller:
+        raise HTTPException(status_code=404, detail="Seller not found")
+    return {
+        "id": str(seller["_id"]),
+        "name": seller["name"],
+        "store_name": seller["store_name"],
+        "email": seller["email"],
+    }

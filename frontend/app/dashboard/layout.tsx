@@ -5,12 +5,21 @@ import { useRouter } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
 import VoiceFAB from "@/components/voice/VoiceFAB";
+import VoiceProductModal from "@/components/voice/VoiceProductModal";
 import ChatPanel from "@/components/chat/ChatPanel";
 import { ChatProvider, useChatContext } from "@/context/ChatContext";
 import { isAuthenticated } from "@/lib/auth";
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
-  const { isOpen, togglePanel } = useChatContext();
+  const router = useRouter();
+  const { isOpen, togglePanel, pendingNavigation, clearNavigation } = useChatContext();
+
+  useEffect(() => {
+    if (pendingNavigation) {
+      router.push(pendingNavigation);
+      clearNavigation();
+    }
+  }, [pendingNavigation, router, clearNavigation]);
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -48,6 +57,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       </div>
 
       {process.env.NEXT_PUBLIC_ENABLE_VOICE === "true" ? <VoiceFAB /> : null}
+      <VoiceProductModal />
     </div>
   );
 }

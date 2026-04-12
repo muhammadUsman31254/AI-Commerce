@@ -7,6 +7,7 @@ from services.assemblyai_stt import transcribe_audio
 from services.elevenlabs_tts import text_to_speech
 from agent.agent import get_agent
 from agent.tools import current_seller_id
+from routes._agent_actions import parse_agent_actions
 
 router = APIRouter(prefix="/voice-command", tags=["voice"])
 
@@ -30,6 +31,11 @@ async def voice_command(
     try:
         agent = get_agent()
         config = {"configurable": {"thread_id": seller_id}}
+
+        # Record how many messages exist before this turn
+        state_before = await agent.aget_state(config)
+        msgs_before = len(state_before.values.get("messages", []))
+
         result = await agent.ainvoke(
             {"messages": [{"role": "user", "content": transcript}]},
             config=config,
@@ -40,16 +46,22 @@ async def voice_command(
     finally:
         current_seller_id.reset(token)
 
-    # 3. Text-to-Speech
+    # 3. Only scan NEW messages from this turn (not old history)
+    new_messages = result["messages"][msgs_before:]
+    agent_action = parse_agent_actions(new_messages)
+
+    # 4. Text-to-Speech
+    audio_b64 = ""
     try:
         audio_bytes = await text_to_speech(reply_text)
         audio_b64 = base64.b64encode(audio_bytes).decode()
-    except Exception as e:
-        # TTS failure is non-fatal — return text reply without audio
-        audio_b64 = ""
+    except Exception as tts_err:
+        print(f"[TTS ERROR] {tts_err}")
 
-    return JSONResponse({
+    response: dict = {
         "transcript": transcript,
         "reply": reply_text,
         "audio_base64": audio_b64,
-    })
+        **agent_action,
+    }
+    return JSONResponse(response)

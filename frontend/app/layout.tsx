@@ -12,8 +12,8 @@ const urdu = Noto_Nastaliq_Urdu({
 });
 
 export const metadata: Metadata = {
-  title: "AI-Commerce | Clay & Craft",
-  description: "AI-powered e-commerce dashboard for home-based Pakistani sellers",
+  title: "AI-COMMERCE",
+  description: "Voice-powered AI e-commerce platform for Pakistani home-based sellers",
 };
 
 export default function RootLayout({

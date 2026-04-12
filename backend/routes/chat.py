@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from auth.jwt import get_current_seller
 from agent.agent import get_agent
 from agent.tools import current_seller_id
+from routes._agent_actions import parse_agent_actions
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -21,6 +22,11 @@ async def chat(body: ChatRequest, seller_id: str = Depends(get_current_seller)):
     try:
         agent = get_agent()
         config = {"configurable": {"thread_id": seller_id}}
+
+        # Record how many messages exist before this turn
+        state_before = await agent.aget_state(config)
+        msgs_before = len(state_before.values.get("messages", []))
+
         result = await agent.ainvoke(
             {"messages": [{"role": "user", "content": body.message}]},
             config=config,
@@ -31,4 +37,7 @@ async def chat(body: ChatRequest, seller_id: str = Depends(get_current_seller)):
     finally:
         current_seller_id.reset(token)
 
-    return {"reply": reply}
+    # Only scan NEW messages from this turn (not old history)
+    new_messages = result["messages"][msgs_before:]
+    agent_action = parse_agent_actions(new_messages)
+    return {"reply": reply, **agent_action}

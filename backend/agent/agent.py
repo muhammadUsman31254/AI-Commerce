@@ -1,6 +1,5 @@
 from langchain.agents import create_agent
 from langgraph.checkpoint.memory import MemorySaver
-from langchain_groq import ChatGroq
 from agent.tools import ALL_TOOLS
 from agent.prompts import SYSTEM_PROMPT
 from config import settings
@@ -8,14 +7,30 @@ from config import settings
 _agent = None
 
 
+def _build_model():
+    """Return the best available LLM — Ollama (local) if configured, else Groq."""
+    if settings.ollama_model:
+        from langchain_ollama import ChatOllama
+        print(f"Using Ollama model: {settings.ollama_model} @ {settings.ollama_base_url}")
+        return ChatOllama(
+            model=settings.ollama_model,
+            base_url=settings.ollama_base_url,
+            temperature=0,
+        )
+
+    from langchain_groq import ChatGroq
+    print("Using Groq model: llama-3.3-70b-versatile")
+    return ChatGroq(
+        model="llama-3.3-70b-versatile",
+        api_key=settings.groq_api_key,
+        temperature=0,
+    )
+
+
 def init_agent():
     global _agent
     try:
-        model = ChatGroq(
-            model="llama-3.3-70b-versatile",
-            api_key=settings.groq_api_key,
-            temperature=0,
-        )
+        model = _build_model()
         checkpointer = MemorySaver()
         _agent = create_agent(
             model,
@@ -31,5 +46,5 @@ def init_agent():
 
 def get_agent():
     if _agent is None:
-        raise RuntimeError("Voice agent is not available. Check your GROQ_API_KEY and LangChain setup.")
+        raise RuntimeError("Voice agent is not available. Check your LLM configuration.")
     return _agent

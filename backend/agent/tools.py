@@ -1,10 +1,10 @@
-from langchain_core.tools import tool
-from bson import ObjectId
-from datetime import datetime
-from typing import Optional
-
-# seller_id is injected per-request via a context var
+import json
 import contextvars
+from datetime import datetime
+from bson import ObjectId
+from langchain_core.tools import tool
+
+# Injected per-request by the voice/chat route so tools know which seller is active
 current_seller_id: contextvars.ContextVar[str] = contextvars.ContextVar("current_seller_id")
 
 
@@ -13,188 +13,182 @@ def get_db():
     return db
 
 
-# ── Tools ─────────────────────────────────────────────────────────────────────
+# ── 1. Add Product ────────────────────────────────────────────────────────────
 
 @tool
-async def add_product(product_name: str, price: float, quantity: int, description: str = "", category: str = "") -> str:
-    """Add a new product to the seller's store."""
-    db = get_db()
-    sid = current_seller_id.get()
-    now = datetime.utcnow()
-    await db.products.insert_one({
-        "seller_id": ObjectId(sid),
-        "name": product_name,
-        "price": price,
-        "quantity": quantity,
-        "description": description,
-        "category": category,
-        "images": [],
-        "status": "active",
-        "created_at": now,
-        "updated_at": now,
-    })
-    return f"{product_name} successfully add ho gaya! Price: Rs.{price:.0f}, Stock: {quantity} pieces."
+async def add_product(name: str, price: float, quantity: int, category: str = "") -> str:
+    """
+    Use when the seller wants to add a new product to their store.
+    Extract product name, price, and quantity from what the seller said.
+    If any of these three are missing, ask for them before calling this tool.
+    Triggers a photo-upload popup in the UI; Gemini will auto-generate
+    the description once the seller uploads a photo.
+    """
+    data = {"name": name, "price": price, "quantity": quantity, "category": category}
+    return f"__UPLOAD_IMAGE__:{json.dumps(data, ensure_ascii=False)}"
 
+
+# ── 2. Show Products ──────────────────────────────────────────────────────────
 
 @tool
-async def update_stock(product_name: str, quantity: int) -> str:
-    """Update the stock quantity of an existing product by name."""
-    db = get_db()
-    sid = current_seller_id.get()
-    result = await db.products.update_one(
-        {"name": {"$regex": product_name, "$options": "i"}, "seller_id": ObjectId(sid)},
-        {"$set": {"quantity": quantity, "status": "active" if quantity > 0 else "out_of_stock", "updated_at": datetime.utcnow()}}
-    )
-    if result.matched_count == 0:
-        return f"'{product_name}' naam ka koi product nahi mila. Dobara check karein."
-    return f"{product_name} ka stock update ho gaya. Naya stock: {quantity} pieces."
-
-
-@tool
-async def view_orders(status: str = "new") -> str:
-    """Fetch seller orders filtered by status. Status options: new, confirmed, shipped, delivered, rejected, all."""
-    db = get_db()
-    sid = current_seller_id.get()
-    query: dict = {"seller_id": ObjectId(sid)}
-    if status != "all":
-        query["status"] = status
-    orders = await db.orders.find(query).sort("created_at", -1).to_list(10)
-    if not orders:
-        return f"Koi {status} orders nahi hain abhi."
-    lines = [
-        f"Order #{str(o['_id'])[-6:].upper()}: {o['buyer_name']} — Rs.{o['total_amount']:.0f} ({o['status']})"
-        for o in orders
-    ]
-    return f"Aap ke {status} orders ({len(orders)}):\n" + "\n".join(lines)
-
-
-@tool
-async def confirm_order(order_id: str) -> str:
-    """Confirm a pending order. Pass the last 6 characters of the order ID."""
-    db = get_db()
-    sid = current_seller_id.get()
-    # Try to match by last-6 suffix
-    orders = await db.orders.find({"seller_id": ObjectId(sid), "status": "new"}).to_list(100)
-    matched = [o for o in orders if str(o["_id"]).endswith(order_id.lower())]
-    if not matched:
-        return f"Order #{order_id} nahi mila ya already processed hai."
-    order = matched[0]
-    await db.orders.update_one(
-        {"_id": order["_id"]},
-        {"$set": {"status": "confirmed", "updated_at": datetime.utcnow()}}
-    )
-    return f"Order #{str(order['_id'])[-6:].upper()} confirm ho gaya! Buyer: {order['buyer_name']}."
-
-
-@tool
-async def reject_order(order_id: str, reason: str = "") -> str:
-    """Reject an order by its last-6-character ID with an optional reason."""
-    db = get_db()
-    sid = current_seller_id.get()
-    orders = await db.orders.find({"seller_id": ObjectId(sid), "status": "new"}).to_list(100)
-    matched = [o for o in orders if str(o["_id"]).endswith(order_id.lower())]
-    if not matched:
-        return f"Order #{order_id} nahi mila ya already processed hai."
-    order = matched[0]
-    await db.orders.update_one(
-        {"_id": order["_id"]},
-        {"$set": {"status": "rejected", "rejection_reason": reason, "updated_at": datetime.utcnow()}}
-    )
-    return f"Order #{str(order['_id'])[-6:].upper()} reject ho gaya."
-
-
-@tool
-async def get_analytics(period: str = "today") -> str:
-    """Get sales analytics summary. Period options: today, week, month."""
-    from datetime import timedelta
+async def show_products(category: str = "") -> str:
+    """
+    Use when the seller wants to see or browse their products.
+    Navigates to the products page and returns a voice-friendly summary.
+    Pass category only if the seller specifically asks to filter by one.
+    """
     db = get_db()
     sid = current_seller_id.get()
 
-    now = datetime.utcnow()
-    if period == "today":
-        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    elif period == "week":
-        start = now - timedelta(days=7)
-    else:
-        start = now - timedelta(days=30)
-
-    orders = await db.orders.find({
-        "seller_id": ObjectId(sid),
-        "created_at": {"$gte": start},
-        "status": {"$ne": "rejected"},
-    }).to_list(1000)
-
-    total = sum(o["total_amount"] for o in orders)
-    count = len(orders)
-
-    # Top product
-    sales: dict = {}
-    for o in orders:
-        for item in o.get("items", []):
-            n = item["product_name"]
-            sales[n] = sales.get(n, 0) + item["quantity"]
-    top = max(sales, key=sales.get) if sales else None
-
-    summary = f"{period.capitalize()} mein {count} orders aaye, total sales Rs.{total:.0f}."
-    if top:
-        summary += f" Sab se zyada bikne wala product: {top} ({sales[top]} pieces)."
-
-    # Low stock warning
-    low = await db.products.find({"seller_id": ObjectId(sid), "quantity": {"$lt": 5, "$gt": 0}}).to_list(5)
-    if low:
-        names = ", ".join(p["name"] for p in low)
-        summary += f" Low stock alert: {names}."
-    return summary
-
-
-@tool
-async def view_products(category: str = "") -> str:
-    """View all products in the seller's store. Optionally filter by category."""
-    db = get_db()
-    sid = current_seller_id.get()
     query: dict = {"seller_id": ObjectId(sid)}
     if category:
         query["category"] = {"$regex": category, "$options": "i"}
-    products = await db.products.find(query).sort("created_at", -1).to_list(50)
-    if not products:
-        return "Aap ke store mein abhi koi product nahi hai." if not category else f"'{category}' category mein koi product nahi mila."
-    lines = [
-        f"{i+1}. {p['name']} — Rs.{p['price']:.0f}, Stock: {p['quantity']}, Status: {p['status']}"
-        for i, p in enumerate(products)
-    ]
-    return f"Aap ke products ({len(products)}):\n" + "\n".join(lines)
 
+    products = await db.products.find(query).sort("created_at", -1).to_list(100)
+    count = len(products)
+
+    if count == 0:
+        summary = (
+            "Aap ke store mein abhi koi product nahi hai."
+            if not category
+            else f"'{category}' category mein koi product nahi mila."
+        )
+    else:
+        active = sum(1 for p in products if p.get("status") == "active")
+        low    = sum(1 for p in products if p.get("quantity", 0) < 5)
+        summary = f"Aap ke store mein {count} products hain. {active} active hain."
+        if low:
+            summary += f" {low} products ka stock kam hai."
+
+    return f"__NAVIGATE__:/dashboard/products\n{summary}"
+
+
+# ── 3. Show Orders ────────────────────────────────────────────────────────────
 
 @tool
-async def delete_product(product_name: str) -> str:
-    """Delete a product from the seller's store by name."""
+async def show_orders(status: str = "all") -> str:
+    """
+    Use when the seller wants to see their orders.
+    Detect status from what the seller said:
+      'naye orders' or 'new'       → status='new'
+      'confirm orders'             → status='confirmed'
+      'shipped'                    → status='shipped'
+      'delivered'                  → status='delivered'
+      'rejected'                   → status='rejected'
+      anything else / 'sare orders'→ status='all'
+    Navigates to the correct orders page and returns a voice summary.
+    """
     db = get_db()
     sid = current_seller_id.get()
-    product = await db.products.find_one(
-        {"name": {"$regex": product_name, "$options": "i"}, "seller_id": ObjectId(sid)}
-    )
-    if not product:
-        return f"'{product_name}' naam ka koi product nahi mila."
-    await db.products.delete_one({"_id": product["_id"]})
-    return f"{product['name']} delete ho gaya store se."
 
+    valid_statuses = {"new", "confirmed", "shipped", "delivered", "rejected"}
+    status = status.lower().strip()
+    if status not in valid_statuses:
+        status = "all"
+
+    query: dict = {"seller_id": ObjectId(sid)}
+    if status != "all":
+        query["status"] = status
+
+    orders = await db.orders.find(query).sort("created_at", -1).to_list(100)
+    count  = len(orders)
+    route  = "/dashboard/orders" if status == "all" else f"/dashboard/orders?status={status}"
+
+    if count == 0:
+        label   = f"{status} " if status != "all" else ""
+        summary = f"Abhi koi {label}orders nahi hain."
+    else:
+        total   = sum(o.get("total_amount", 0) for o in orders)
+        label   = f"{status} " if status != "all" else ""
+        summary = (
+            f"Aap ke {count} {label}orders hain. "
+            f"Total amount: Rs.{total:.0f}."
+        )
+
+    return f"__NAVIGATE__:{route}\n{summary}"
+
+
+# ── 4. Confirm or Reject an Order ─────────────────────────────────────────────
 
 @tool
-async def analyze_photo(image_url: str) -> str:
-    """Use Gemini to write a very short caption for a product photo URL."""
-    from services.gemini_vision import caption_image_from_url
-    caption = await caption_image_from_url(image_url)
-    return f"Caption: {caption}"
+async def confirm_or_reject_order(order_id: str, action: str, reason: str = "") -> str:
+    """
+    Use when the seller wants to confirm or reject a specific order.
+    action must be 'confirm' or 'reject'.
+    order_id is the short ID the seller mentions (last 6 characters of the MongoDB _id).
+    reason is optional and only relevant for rejection.
+    """
+    db  = get_db()
+    sid = current_seller_id.get()
 
+    action = action.lower().strip()
+    if action not in {"confirm", "reject"}:
+        return "Action samajh nahi aaya. 'confirm' ya 'reject' bolein."
+
+    # Match order by trailing 6-char suffix (case-insensitive)
+    all_orders = await db.orders.find({"seller_id": ObjectId(sid)}).to_list(500)
+    matched = [o for o in all_orders if str(o["_id"]).lower().endswith(order_id.lower())]
+
+    if not matched:
+        return (
+            f"Order #{order_id} nahi mila. "
+            "Pehle orders dekhein aur sahi ID batayein."
+        )
+
+    order = matched[0]
+    short_id = str(order["_id"])[-6:].upper()
+    buyer    = order.get("buyer_name", "")
+    amount   = order.get("total_amount", 0)
+
+    if action == "confirm":
+        await db.orders.update_one(
+            {"_id": order["_id"]},
+            {"$set": {"status": "confirmed", "updated_at": datetime.utcnow()}},
+        )
+        return (
+            f"Order #{short_id} confirm ho gaya! "
+            f"Buyer: {buyer}, Amount: Rs.{amount:.0f}."
+        )
+    else:  # reject
+        await db.orders.update_one(
+            {"_id": order["_id"]},
+            {"$set": {
+                "status": "rejected",
+                "rejection_reason": reason,
+                "updated_at": datetime.utcnow(),
+            }},
+        )
+        return f"Order #{short_id} reject ho gaya. Buyer: {buyer}."
+
+
+# ── 5. Delete Product ─────────────────────────────────────────────────────────
+
+@tool
+async def delete_product(name: str) -> str:
+    """
+    Use when the seller wants to remove a specific product from their store.
+    Extract the product name from what the seller said.
+    Matches by name (case-insensitive, partial match allowed).
+    """
+    db  = get_db()
+    sid = current_seller_id.get()
+
+    product = await db.products.find_one(
+        {"name": {"$regex": name, "$options": "i"}, "seller_id": ObjectId(sid)}
+    )
+    if not product:
+        return f"'{name}' naam ka koi product store mein nahi mila."
+
+    await db.products.delete_one({"_id": product["_id"]})
+    return f"{product['name']} store se delete ho gaya."
+
+
+# ── Exported list ─────────────────────────────────────────────────────────────
 
 ALL_TOOLS = [
     add_product,
-    update_stock,
-    view_products,
+    show_products,
+    show_orders,
+    confirm_or_reject_order,
     delete_product,
-    view_orders,
-    confirm_order,
-    reject_order,
-    get_analytics,
-    analyze_photo,
 ]

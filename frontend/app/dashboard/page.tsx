@@ -49,15 +49,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-        <h3 className="text-base font-semibold text-gray-900 mb-4">{t("quick_actions")}</h3>
-        <div className="flex flex-wrap gap-3">
-          <Link href="/dashboard/products/add" className="btn-primary">{t("add_product")}</Link>
-          <Link href="/dashboard/orders" className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">{t("view_orders")}</Link>
-          <Link href="/dashboard/analytics" className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">{t("check_analytics")}</Link>
-        </div>
-      </div>
     </div>
   );
 }

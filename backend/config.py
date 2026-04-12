@@ -11,7 +11,11 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 24 * 7  # 7 days
 
-    # Groq / voice & vision (optional until those features are enabled)
+    # Ollama (local) — set ollama_model to use instead of Groq, e.g. "mistral:7b"
+    ollama_model: str = ""
+    ollama_base_url: str = "http://localhost:11434"
+
+    # Groq (cloud fallback)
     groq_api_key: str = ""
     assemblyai_api_key: str = ""
     elevenlabs_api_key: str = ""
