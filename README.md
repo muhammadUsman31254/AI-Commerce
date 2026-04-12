@@ -143,19 +143,6 @@ Browser plays audio + chat panel shows transcript & reply
 
 ---
 
-## Demo
-
-Seed the database with sample products for the demo seller **"Clay & Craft"** (handmade pottery store):
-
-```bash
-cd backend
-python scripts/seed.py
-```
-
-Sample products: Handmade Clay Mug (Rs. 1,200), Decorative Ceramic Vase (Rs. 3,500), Clay Bowl Set (Rs. 2,800), Hand-painted Ceramic Plate (Rs. 1,800), Rustic Pottery Planter (Rs. 4,200).
-
----
-
 ## License
 
 MIT
