@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -10,6 +11,7 @@ from routes.inventory import router as inventory_router
 from routes.analytics import router as analytics_router
 from routes.voice import router as voice_router
 from routes.chat import router as chat_router
+from routes.voice_register import router as voice_register_router
 
 
 @asynccontextmanager
@@ -26,9 +28,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="AI-Commerce API", version="1.0.0", lifespan=lifespan)
 
+# CORS — comma-separated list of allowed origins via env var, defaults to localhost
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
+allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -41,6 +47,7 @@ app.include_router(inventory_router)
 app.include_router(analytics_router)
 app.include_router(voice_router)
 app.include_router(chat_router)
+app.include_router(voice_register_router)
 
 
 @app.get("/")

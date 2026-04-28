@@ -2,8 +2,6 @@
 
 An AI-integrated e-commerce platform built for home-based Pakistani sellers, enabling store management through **voice commands in Urdu**, a full manual dashboard, and AI-driven automation.
 
-> **FYP Project** — Muhammad Usman, 2026
-
 ---
 
 ## Features
@@ -16,7 +14,6 @@ An AI-integrated e-commerce platform built for home-based Pakistani sellers, ena
 - **Order Management** — View, confirm, and reject orders with status tracking
 - **Inventory Tracking** — Real-time stock levels with low-stock alerts
 - **Analytics Dashboard** — Revenue charts, top products, and AI-generated insights (Recharts)
-- **JWT Authentication** — Secure seller login and registration
 
 ---
 
@@ -24,15 +21,14 @@ An AI-integrated e-commerce platform built for home-based Pakistani sellers, ena
 
 | Layer | Technology |
 |---|---|
-| Frontend | Next.js 14 (App Router) + Tailwind CSS |
+| Frontend | Next.js 14 + Tailwind CSS |
 | Backend | FastAPI (Python) |
-| Database | MongoDB Atlas (Motor async driver) |
+| Database | MongoDB Atlas |
 | LLM / Agent | LangChain + Groq (`llama-3.3-70b-versatile`) |
 | Speech-to-Text | AssemblyAI REST API |
-| Text-to-Speech | ElevenLabs (`eleven_multilingual_v2`) |
+| Text-to-Speech | ElevenLabs |
 | Vision AI | Google Gemini 2.5 Flash |
 | Image Storage | Cloudinary |
-| Auth | JWT (python-jose) |
 
 ---
 
@@ -58,7 +54,6 @@ fyp/
 │
 ├── requirements.txt          # Python dependencies
 ├── .env.example              # Environment variable template
-└── docs.md                   # Architecture and API reference docs
 ```
 
 ---
@@ -75,8 +70,8 @@ fyp/
 ### 1. Clone and configure environment
 
 ```bash
-git clone https://github.com/<your-username>/ai-commerce-fyp.git
-cd ai-commerce-fyp
+git clone https://github.com/muhammadUsman31254/AI-Commerce.git
+cd fyp-copy
 
 # Copy env template and fill in your keys
 cp .env.example .env
@@ -89,7 +84,7 @@ Edit `.env` with your actual API keys (see `.env.example` for all required varia
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate      # Windows: venv\Scripts\activate
+venv\Scripts\activate      
 pip install -r ../requirements.txt
 uvicorn main:app --reload --port 8000
 ```
@@ -101,7 +96,7 @@ Backend runs at `http://localhost:8000`
 ```bash
 cd frontend
 npm install          # or: yarn install
-npm run dev
+npm run dev          # or: yarn dev
 ```
 
 Frontend runs at `http://localhost:3000`
@@ -136,9 +131,9 @@ Browser plays audio + chat panel shows transcript & reply
 |---|---|
 | Groq | [console.groq.com](https://console.groq.com) |
 | AssemblyAI | [assemblyai.com](https://www.assemblyai.com) |
-| ElevenLabs | [elevenlabs.io](https://elevenlabs.io) → Profile → API Keys |
-| Google Gemini | [aistudio.google.com](https://aistudio.google.com) → Get API Key |
-| Cloudinary | [cloudinary.com](https://cloudinary.com) → Dashboard |
+| ElevenLabs | [elevenlabs.io](https://elevenlabs.io) |
+| Google Gemini | [aistudio.google.com](https://aistudio.google.com) |
+| Cloudinary | [cloudinary.com](https://cloudinary.com) |
 | MongoDB Atlas | [cloud.mongodb.com](https://cloud.mongodb.com) |
 
 ---
