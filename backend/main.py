@@ -28,14 +28,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="AI-Commerce API", version="1.0.0", lifespan=lifespan)
 
-# CORS — comma-separated list of allowed origins via env var, defaults to localhost
+# CORS — set ALLOWED_ORIGINS=* to allow all, or comma-separated list of origins
 _raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
-allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+_origins_list = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+_allow_all = _origins_list == ["*"]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
+    allow_origins=["*"] if _allow_all else _origins_list,
+    allow_credentials=False if _allow_all else True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
